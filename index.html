@@ -1,0 +1,352 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Calendar, MapPin, Clock, Phone, Navigation, 
+  Utensils, ShoppingBag, Car, Copy, Check, 
+  ExternalLink, ChevronRight, Info, Coffee, 
+  ChevronDown, ChevronUp, Search, Snowflake,
+  Home, Plane, Sparkles, Thermometer, CloudSun, 
+  Wind, Loader2, Umbrella, Droplets
+} from 'lucide-react';
+
+const App = () => {
+  const [activeTab, setActiveTab] = useState('itinerary'); 
+  const [activeDay, setActiveDay] = useState(0);
+  const [copiedId, setCopiedId] = useState(null);
+  const [expandedSection, setExpandedSection] = useState({ 's-0': true });
+
+  // Gemini API 相關
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherInfo, setWeatherInfo] = useState({});
+  const apiKey = ""; // 執行環境將提供金鑰
+
+  // --- 行程資料 ---
+  const itinerary = [
+    { date: "02/08", weekday: "SUN", title: "抵達名古屋：機場集結", location: "名古屋", items: [
+      { time: "13:10", name: "機場接送預約", type: "transport", note: "預約接送 $896", hours: "13:10 接機", location: "名古屋中部國際機場 T1" },
+      { time: "17:15", name: "華航 CI150", type: "transport", note: "手提 7kg + 托運 23kg", hours: "17:15 桃園 T2 -> 20:50 名古屋 T1", tel: "+88624129000" },
+      { time: "晚上", name: "Comfort Hotel 中部國際機場", type: "hotel", note: "3人房￥15,400", hours: "Check-in 15:00", tel: "+81569387211", mp: "371 671 275*11" }
+    ]},
+    { date: "02/09", weekday: "MON", title: "自駕啟程：瑞浪與諏訪", location: "瑞浪市, 諏訪市", items: [
+      { time: "09:30", name: "Toyota Rental", type: "transport", note: "￥86,130 (已確認雪胎)", hours: "09:30 取車", tel: "+81569380100" },
+      { time: "12:00", name: "惠那川上屋 瑞喜舍 瑞浪店", type: "food", note: "必買：蒙布朗", hours: "09:00 - 18:30", mp: "98 403 165", tel: "+81572685220" },
+      { time: "13:30", name: "明治亭 駒ヶ根本店", type: "food", note: "必吃醬汁豬排丼", hours: "11:00 - 20:30", mp: "143 860 343*16", tel: "+81265831115" },
+      { time: "15:30", name: "諏訪大社 上社本宮", type: "spot", note: "古老神社參拜", hours: "09:00 - 17:00", mp: "15 436 735", tel: "+81266521919" },
+      { time: "17:00", name: "Alpen スポーツデポ 諏訪", type: "shop", note: "滑雪用品補給", hours: "10:00 - 20:00", mp: "218 601 000*34", tel: "+81266822112" },
+      { time: "20:00", name: "鶴屋超市 茅野店", type: "shop", note: "備物首選", mp: "218 575 528*71", tel: "+81266750611" },
+      { time: "晚上", name: "蓼科東急 繆科會館", type: "hotel", note: "￥104,130", mp: "218 825 621*60", tel: "+81266693109" }
+    ]},
+    { date: "02/10", weekday: "TUE", title: "滑雪日：蓼科東急", location: "茅野市", items: [
+      { time: "09:00", name: "蓼科東急スキー場", type: "spot", note: "適合熱身", mp: "218 826 876*20", tel: "+81266693271" },
+      { time: "18:00", name: "東山食堂 茅野店", type: "food", note: "必吃成吉思汗烤肉", mp: "218 701 395*42", tel: "+81266711515" }
+    ]},
+    { date: "02/11", weekday: "WED", title: "金運神社與御殿場", location: "富士吉田, 御殿場", items: [
+      { time: "11:00", name: "新屋山神社", type: "spot", note: "財運神社", mp: "161 156 601", tel: "+81555240932" },
+      { time: "13:00", name: "御殿場 Premium Outlets", type: "shop", note: "富士山景觀", mp: "50 806 376", tel: "+81550813122" },
+      { time: "17:20", name: "Blueberry Gotemba", type: "food", note: "精緻甜點", mp: "50 742 329", tel: "+81550813030" },
+      { time: "20:30", name: "燒肉三夢 諏訪店", type: "food", note: "吃到飽", mp: "218 600 328", tel: "+81266821136" }
+    ]},
+    { date: "02/12", weekday: "THU", title: "滑雪日：皮拉圖斯", location: "皮拉圖斯", items: [
+      { time: "09:00", name: "ピ拉塔斯蓼科滑雪場", type: "spot", note: "4km 長滑道", mp: "218 885 861*81", tel: "+81266672009" },
+      { time: "18:00", name: "勝味庵 本店", type: "food", note: "炸豬排", mp: "218 571 502*81", tel: "+81266731058" }
+    ]},
+    { date: "02/13", weekday: "FRI", title: "滑雪日：皮拉圖斯 Day 2", location: "皮拉圖斯", items: [
+      { time: "09:00", name: "ピ拉塔斯蓼科滑雪場", type: "spot", note: "深度練習", tel: "+81266672009" },
+      { time: "19:00", name: "Italian Kitchen VANSAN", type: "food", note: "義式料理", mp: "218 571 823*63", tel: "+81266755353" }
+    ]},
+    { date: "02/14", weekday: "SAT", title: "名古屋漫遊與採買", location: "名古屋", items: [
+      { time: "11:30", name: "名古屋城", type: "spot", note: "二之丸停車場", mp: "4 348 699*01", tel: "+81522311700" },
+      { time: "14:00", name: "HARBS 榮本店", type: "food", note: "水果千層蛋糕", tel: "+81529629810" },
+      { time: "18:00", name: "AEON Mall 臨空常滑", type: "shop", note: "機場旁最後採買", tel: "+81569332700" },
+      { time: "19:30", name: "東橫INN 中部國際機場", type: "hotel", note: "2/14 入住", tel: "+81569380045" }
+    ]},
+    { date: "02/15", weekday: "SUN", title: "順利返台", location: "機場", items: [
+      { time: "07:30", name: "抵達機場 T1", type: "transport", tel: "+81569381195" },
+      { time: "09:50", name: "華航 CI151", type: "transport", note: "回首頁" }
+    ]}
+  ];
+
+  const restaurantList = [
+    { region: "茅野 / 諏訪", type: "燒肉精選", places: [
+      { name: "東山食堂 茅野店", mp: "218 701 395*42", tel: "+81266711515", note: "成吉思汗" },
+      { name: "炭火焼肉 信州亭", mp: "218 576 781*50", tel: "+81266721010" },
+      { name: "焼肉ダイニング 緣結", mp: "218 602 390*16", tel: "+81266822929", note: "四OFF" },
+      { name: "燒肉三夢 諏訪店", mp: "218 600 329*26", tel: "+81266821136", note: "放題" },
+      { name: "牛角 諏訪インター店", mp: "218 602 064*17", tel: "+81266822929", note: "放題" },
+      { name: "燒肉じゅうじゅうカルビ", mp: "75 119 237*76", tel: "+81266541129", note: "放題" }
+    ]},
+    { region: "茅野 / 諏訪", type: "拉麵 / 蕎麥", places: [
+      { name: "雷蔵 茅野本店", mp: "218 574 350*11", tel: "+81266738439", note: "味噌拉麵" },
+      { name: "蕎麥の郷", mp: "218 574 453*78", tel: "+81266731111" },
+      { name: "丸龜製麵 茅野", mp: "218 573 534*17", tel: "+81266712330" },
+      { name: "一風堂 諏訪店", mp: "218 601 070*04", tel: "+81266820551" },
+      { name: "小作 餺飥麵", mp: "218 571 881*32", tel: "+81266711355", note: "山梨特色" },
+      { name: "ハルピンラーメン 諏訪本店", mp: "218 630 289*81", tel: "+81266531557" }
+    ]},
+    { region: "茅野 / 諏訪", type: "麵包 / 甜點", places: [
+      { name: "Gelateria Picco", mp: "218 670 379*67", tel: "+81266731548", note: "三OFF, 冰淇淋" },
+      { name: "APPLE PIE lab", mp: "218 606 640*04", tel: "+81266672009", note: "蘋果派" },
+      { name: "信州大黑屋", mp: "218 574 010*87", tel: "+81266721708", note: "二三OFF" },
+      { name: "Châteraisé", mp: "218 600 005*68", tel: "+81266712211" },
+      { name: "Boulangerie Kerokku", mp: "218 700 409*77", tel: "+81266712010", note: "二三OFF" },
+      { name: "パンドトナリテ", mp: "218 670 219*54", tel: "+81266731174", note: "一四OFF" },
+      { name: "ハートフルブレッド パン", mp: "218 542 773*45", tel: "+81266772711", note: "二三OFF" },
+      { name: "ヌーベル梅林堂", mp: "218 638 579*25", tel: "+81266622248", note: "核桃餅乾" },
+      { name: "Bakery Cafe Mozart", mp: "218 601 578*86", tel: "+81266720002", note: "一OFF" },
+      { name: "ruteyu 麵包", mp: "218 606 432*47", tel: "+81266672322", note: "一四OFF" },
+      { name: "Taiyo Bakery", mp: "75 149 586*82", tel: "+81266720311", note: "牛乳麵包" },
+      { name: "不二家 茅野塚原店", mp: "218 574 040*85", tel: "+81266723825" }
+    ]},
+    { region: "茅野 / 諏訪", type: "賣場 / 超市", places: [
+      { name: "鶴屋 茅野店 (ツルヤ)", mp: "218 575 528*71", tel: "+81266750611" },
+      { name: "AEON BIG", mp: "218 636 068*44", tel: "+81266821211" },
+      { name: "A Coop", mp: "218 669 055*74", tel: "+81266721511" },
+      { name: "SEIYU", mp: "218 572 254*60", tel: "+81266721111" },
+      { name: "Alpen スポーツデポ", mp: "218 601 000*34", tel: "+81266822112" },
+      { name: "唐吉軻德 Chino", mp: "218 571 016*35", tel: "+81266825211" }
+    ]},
+    { region: "茅野 / 諏訪", type: "家庭料理 / 日西式", places: [
+      { name: "勝味庵 本店", mp: "218 571 502*81", tel: "+81266731058", note: "三OFF" },
+      { name: "ウッド曼plus", mp: "218 544 793*37", tel: "+81266727771", note: "三四OFF" },
+      { name: "Denny's Chino", mp: "218 573 531*34", tel: "+81266731155" },
+      { name: "Italian Kitchen VANSAN", mp: "218 571 823*63", tel: "+81266755353" },
+      { name: "Gusto 諏訪交流道店", mp: "218 601 512*25", tel: "+81266821216" },
+      { name: "黃金マッハカレー", mp: "218 600 747*50", tel: "+81266751129", note: "二OFF" }
+    ]},
+    { region: "名古屋 / 名物", type: "名店推薦", places: [
+      { name: "一蘭拉麵 名古屋錦店", tel: "+815018082537" },
+      { name: "HARBS 榮本店", tel: "+81529629810", note: "水果千層" },
+      { name: "月島文字燒 久屋大通", tel: "+81522119150" },
+      { name: "熱田蓬萊軒", tel: "+81526718686", note: "鰻魚三吃" }
+    ]}
+  ];
+
+  const fetchWeather = async (dayIdx) => {
+    const day = itinerary[dayIdx];
+    if (weatherInfo[dayIdx]) return;
+    setWeatherLoading(true);
+    try {
+      const prompt = `請提供 2026 年 2 月 ${day.date} 日本「${day.location}」的氣候概況。格式：[低溫]~[高溫]°C | [天氣現象] | 降雨[機率]%。`;
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: "請僅輸出請求的氣象數據。" }] } })
+      });
+      const result = await response.json();
+      setWeatherInfo(prev => ({ ...prev, [dayIdx]: result.candidates?.[0]?.content?.parts?.[0]?.text || "暫無資料" }));
+    } catch (e) { setWeatherInfo(prev => ({ ...prev, [dayIdx]: "連線失敗" })); }
+    finally { setWeatherLoading(false); }
+  };
+
+  useEffect(() => { fetchWeather(activeDay); }, [activeDay]);
+
+  const handleCopy = (text, id) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const getGoogleMapUrl = (name) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`;
+
+  return (
+    <div className="max-w-md mx-auto min-h-screen bg-slate-50 text-slate-900 pb-28 shadow-xl font-sans overflow-x-hidden">
+      {/* 頂部導覽 */}
+      <header className="bg-indigo-950 text-white px-5 pt-6 pb-8 sticky top-0 z-50 rounded-b-[2.5rem] shadow-lg border-b border-indigo-900">
+        <div className="flex justify-between items-center mb-6 px-1">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-white/10 p-2 rounded-xl backdrop-blur-md">
+              <Snowflake className="w-5 h-5 text-blue-300" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight">2026 冬季之旅</h1>
+              <p className="text-indigo-400 text-[8px] uppercase tracking-widest font-bold">Toyota Rental Adventure</p>
+            </div>
+          </div>
+          <Calendar className="w-5 h-5 text-indigo-200 opacity-50" />
+        </div>
+
+        <div className="flex gap-3 overflow-x-auto no-scrollbar px-1">
+          {itinerary.map((day, idx) => (
+            <button
+              key={idx}
+              onClick={() => { setActiveDay(idx); setActiveTab('itinerary'); }}
+              className={`flex-shrink-0 w-16 h-20 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 border ${
+                activeDay === idx && activeTab === 'itinerary'
+                  ? 'bg-white text-indigo-950 shadow-md scale-105 border-white font-bold'
+                  : 'bg-indigo-900/40 text-indigo-200 border-indigo-800/30'
+              }`}
+            >
+              <span className="text-[9px] mb-1 opacity-60 font-bold">{day.weekday}</span>
+              <span className="text-2xl leading-none">{day.date.split('/')[1]}</span>
+              <span className="text-[8px] mt-1 opacity-50 font-bold">{day.date.split('/')[0]}月</span>
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {/* 主內容區 - pt-12 調回 pt-24 確保不被遮擋 */}
+      <main className="px-5 pt-12 relative z-10">
+        {activeTab === 'itinerary' ? (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* 天氣卡片 */}
+            <div className="mb-6 bg-white/90 backdrop-blur-xl p-4 rounded-[2rem] border border-white shadow-md">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-rose-50 p-2 rounded-xl text-rose-500">
+                    <CloudSun className="w-4 h-4" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">Forecast</span>
+                    {weatherLoading ? (
+                      <Loader2 className="w-3 h-3 text-indigo-300 animate-spin" />
+                    ) : (
+                      <span className="text-xs font-black text-slate-600">{weatherInfo[activeDay] || "獲取中"}</span>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => fetchWeather(activeDay)} className="p-1.5 hover:bg-slate-100 rounded-full">
+                  <Sparkles className="w-3 h-3 text-indigo-300" />
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-8 pl-1">
+              <div className="flex items-baseline gap-3 mb-1">
+                <span className="text-5xl font-black text-indigo-100 absolute -left-1 -z-10 select-none opacity-40">{itinerary[activeDay].date.split('/')[1]}</span>
+                <span className="text-3xl font-black text-slate-800 tracking-tighter">Day {activeDay + 1}</span>
+                <span className="text-sm font-black text-indigo-500 tracking-wider">{itinerary[activeDay].weekday}</span>
+              </div>
+              <h2 className="text-xl font-bold text-slate-700">{itinerary[activeDay].title}</h2>
+              <div className="w-12 h-1.5 bg-indigo-500 rounded-full mt-3"></div>
+            </div>
+
+            <div className="space-y-8 relative border-l-2 border-indigo-100 ml-4 pl-8 pb-8">
+              {itinerary[activeDay].items.map((item, idx) => (
+                <div key={idx} className="relative group">
+                  <div className={`absolute -left-[41px] top-1.5 w-6 h-6 rounded-full border-4 border-slate-50 shadow-md z-10 ${
+                    item.type === 'hotel' ? 'bg-amber-500' : (item.type === 'transport' ? 'bg-indigo-600' : 'bg-rose-500')
+                  }`}></div>
+                  <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 group-hover:shadow-lg transition-all duration-300">
+                    <div className="flex justify-between items-start mb-3">
+                      <span className={`text-[10px] font-bold px-3 py-1 rounded-full ${
+                        item.type === 'hotel' ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'
+                      }`}>{item.time}</span>
+                      {item.tel && <a href={`tel:${item.tel}`} className="text-slate-300 p-1.5 hover:text-indigo-50 transition-all"><Phone className="w-4 h-4" /></a>}
+                    </div>
+                    <h3 className="font-bold text-lg text-slate-800 leading-tight mb-2">{item.name}</h3>
+                    <p className="text-xs text-slate-400 mb-5">{item.note}</p>
+                    <div className="space-y-2.5">
+                      {item.tel && (
+                        <div className="flex items-center justify-between bg-emerald-50/40 p-3 rounded-xl border border-emerald-100/20">
+                          <span className="text-[11px] font-bold text-emerald-700">TEL: {item.tel}</span>
+                          <button onClick={() => handleCopy(item.tel, `t-${idx}`)} className="text-emerald-400">
+                            {copiedId === `t-${idx}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      )}
+                      {item.mp && (
+                        <div className="flex items-center justify-between bg-blue-50/40 p-3 rounded-xl border border-blue-100/20">
+                          <span className="text-[11px] font-mono font-bold text-blue-700">MP: {item.mp}</span>
+                          <button onClick={() => handleCopy(item.mp, `m-${idx}`)} className="text-blue-400">
+                            {copiedId === `m-${idx}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => window.open(getGoogleMapUrl(item.name))} className="w-full bg-slate-900 text-white py-4 rounded-2xl text-[13px] font-bold mt-5 shadow-md flex items-center justify-center gap-2">
+                      <Navigation className="w-4 h-4" /> 導覽
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* 口袋名單 */
+          <div className="animate-in fade-in zoom-in-95 duration-500 pb-10">
+            <h2 className="text-3xl font-bold mb-8 flex items-center gap-3 text-slate-800">
+              <div className="bg-orange-500 p-2.5 rounded-2xl shadow-lg"><Utensils className="w-5 h-5 text-white" /></div>
+              口袋名單
+            </h2>
+            <div className="space-y-5">
+              {restaurantList.map((section, sIdx) => (
+                <div key={sIdx} className="bg-white rounded-[2.2rem] shadow-sm border border-slate-100 overflow-hidden">
+                  <button onClick={() => setExpandedSection(prev => ({ ...prev, [`s-${sIdx}`]: !prev[`s-${sIdx}`] }))} className={`w-full flex items-center justify-between p-6 ${expandedSection[`s-${sIdx}`] ? 'bg-orange-50/30' : ''}`}>
+                    <div className="flex items-center gap-4 text-left">
+                      <div className="bg-orange-100 p-3 rounded-2xl text-orange-600"><Coffee className="w-5 h-5" /></div>
+                      <div>
+                        <span className="text-[9px] text-orange-400 block font-black">{section.region}</span>
+                        <span className="text-lg font-bold text-slate-800">{section.type}</span>
+                      </div>
+                    </div>
+                    <ChevronUp className={`w-5 h-5 transition-transform ${expandedSection[`s-${sIdx}`] ? '' : 'rotate-180'}`} />
+                  </button>
+                  {expandedSection[`s-${sIdx}`] && (
+                    <div className="px-5 pb-5 space-y-3">
+                      {section.places.map((p, pIdx) => (
+                        <div key={pIdx} className="p-5 bg-slate-50/40 rounded-3xl border border-transparent hover:border-orange-100 hover:bg-white transition-all">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <h4 className="text-[15px] font-bold text-slate-800">{p.name}</h4>
+                              {p.note && <span className="text-[10px] text-orange-500 font-bold">{p.note}</span>}
+                            </div>
+                            <ExternalLink className="w-4 h-4 text-indigo-300" onClick={() => window.open(getGoogleMapUrl(p.name))} />
+                          </div>
+                          <div className="space-y-2">
+                            {p.tel && (
+                              <div className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-slate-100 text-[11px] font-bold text-slate-500">
+                                <span><Phone className="w-3 h-3 inline mr-1" /> {p.tel}</span>
+                                <Copy className="w-3 h-3" onClick={() => handleCopy(p.tel, `rt-${sIdx}-${pIdx}`)} />
+                              </div>
+                            )}
+                            {p.mp && (
+                              <div className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-slate-100 text-[11px] font-mono font-bold text-slate-500">
+                                <span><MapPin className="w-3 h-3 inline mr-1" /> {p.mp}</span>
+                                <Copy className="w-3 h-3" onClick={() => handleCopy(p.mp, `rm-${sIdx}-${pIdx}`)} />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* 底部導航欄 */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-2xl border-t border-slate-100 px-10 py-5 z-50 rounded-t-[3rem] shadow-xl">
+        <div className="flex justify-between items-center max-w-md mx-auto">
+          <button onClick={() => setActiveTab('itinerary')} className={`flex flex-col items-center gap-1.5 ${activeTab === 'itinerary' ? 'text-indigo-950 scale-105' : 'text-slate-300'}`}>
+            <div className={`p-3.5 rounded-2xl ${activeTab === 'itinerary' ? 'bg-indigo-950 text-white shadow-lg' : ''}`}><Calendar className="w-5 h-5" /></div>
+            <span className="text-[9px] font-black uppercase">Itinerary</span>
+          </button>
+          <button onClick={() => setActiveTab('food')} className={`flex flex-col items-center gap-1.5 ${activeTab === 'food' ? 'text-orange-600 scale-105' : 'text-slate-300'}`}>
+            <div className={`p-3.5 rounded-2xl ${activeTab === 'food' ? 'bg-orange-600 text-white shadow-lg' : ''}`}><Utensils className="w-5 h-5" /></div>
+            <span className="text-[9px] font-black uppercase">Dining</span>
+          </button>
+          <button onClick={() => { const last = itinerary[activeDay].items.slice(-1)[0]; window.open(getGoogleMapUrl(last.name)); }} className="flex flex-col items-center gap-1.5 text-slate-300">
+            <div className="p-3.5 rounded-2xl bg-slate-100 text-slate-400"><Navigation className="w-5 h-5" /></div>
+            <span className="text-[9px] font-black uppercase">Map</span>
+          </button>
+        </div>
+      </nav>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+    </div>
+  );
+};
+
+export default App;
